@@ -11,3 +11,7 @@ class_vote_method: majority
 # Export
 export_format: engine
 half: true
+
+# Visualization
+visualize: false
+show_live: false
