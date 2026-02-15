@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Data
+/data/
+/datasets/
+/runs/
+/checkpoints/
+
+# Hydra
+/outputs/
+
+# Claude
+.claude/
+PROJECT_PLAN.md
+CODE_REVIEW.md
+
+# Tests
+/tests/
+
+# Misc.
+.pytest_cache/
