@@ -1,0 +1,8 @@
+# Default detection model — YOLO11m (20.1M params, 51.5 mAP@50)
+# To switch models, override on CLI:
+#   model.name=yolo11l.pt model.variant=yolo11l
+#   model.name=yolo11x.pt model.variant=yolo11x
+#   model.name=yolov8m.pt model.variant=yolov8m
+name: yolo11m.pt
+variant: yolo11m
+imgsz: 640

@@ -1,0 +1,13 @@
+# Inference settings
+conf_thresh: 0.3
+iou_thresh: 0.45
+tracker: bytetrack.yaml
+persist: true
+
+# Counting
+min_track_length: 5
+class_vote_method: majority
+
+# Export
+export_format: engine
+half: true

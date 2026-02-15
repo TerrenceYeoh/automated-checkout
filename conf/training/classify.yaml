@@ -1,0 +1,14 @@
+# Classification pretraining hyperparameters
+epochs: 50
+batch: 64
+patience: 15
+optimizer: AdamW
+lr0: 0.001
+
+# Resume
+resume: false
+
+# Output
+project: runs/classify
+name: pretrain_v1
+exist_ok: true

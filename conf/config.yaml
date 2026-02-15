@@ -1,0 +1,19 @@
+defaults:
+  - model: yolo11m
+  - training: detect
+  - inference: default
+  - data: checkout
+  - mlflow: default
+  - _self_
+
+hydra:
+  output_subdir: null       # Don't create .hydra/ config snapshot dir
+  run:
+    dir: .                  # Stay in the original working directory
+  job:
+    chdir: false            # Don't chdir into the output dir
+
+# Global settings
+device: 0
+seed: 42
+project_root: ${hydra:runtime.cwd}

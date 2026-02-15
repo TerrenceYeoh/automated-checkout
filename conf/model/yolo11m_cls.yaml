@@ -1,0 +1,4 @@
+# YOLO11m classification variant for pretraining
+name: yolo11m-cls.pt
+variant: yolo11m-cls
+imgsz: 224
