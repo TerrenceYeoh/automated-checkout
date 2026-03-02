@@ -10,7 +10,7 @@ defaults:
 hydra:
   output_subdir: null       # Don't create .hydra/ config snapshot dir
   run:
-    dir: .                  # Stay in the original working directory
+    dir: logs/              # Keep Hydra logs out of project root
   job:
     chdir: false            # Don't chdir into the output dir
 
