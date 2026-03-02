@@ -61,4 +61,4 @@ select = [
 ignore = ["E501"]  # line length handled by ruff format
 
 [tool.ruff.lint.isort]
-known-first-party = ["data_prep", "training", "inference", "utils"]
+known-first-party = ["data_prep", "training", "inference", "evaluation", "utils"]
