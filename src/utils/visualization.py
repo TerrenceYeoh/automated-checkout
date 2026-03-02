@@ -37,11 +37,14 @@ def draw_yolo_boxes(
             if len(parts) != 5:
                 continue
 
-            class_id = int(parts[0])
-            x_center = float(parts[1]) * w
-            y_center = float(parts[2]) * h
-            bw = float(parts[3]) * w
-            bh = float(parts[4]) * h
+            try:
+                class_id = int(parts[0])
+                x_center = float(parts[1]) * w
+                y_center = float(parts[2]) * h
+                bw = float(parts[3]) * w
+                bh = float(parts[4]) * h
+            except (ValueError, IndexError):
+                continue
 
             x1 = int(x_center - bw / 2)
             y1 = int(y_center - bh / 2)
