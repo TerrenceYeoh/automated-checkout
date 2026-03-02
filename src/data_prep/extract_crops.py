@@ -145,7 +145,7 @@ def extract_all_crops(
         ):
             try:
                 result = future.result()
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 pair = futures[future]
                 print(f"Warning: failed to process {pair[0].name}: {e}")
                 continue
