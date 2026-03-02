@@ -22,5 +22,8 @@ wheels/
 .claude/
 *.md
 
+# Logs
+*.log
+
 # Misc.
 .pytest_cache/
