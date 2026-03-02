@@ -6,55 +6,12 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ultralytics import YOLO
 
-from src.training.mlflow_utils import mlflow_context
+from training.common import EXCLUDED_KEYS, build_train_args, resolve_last_checkpoint
+from training.mlflow_utils import mlflow_context
 
-# Keys that are not YOLO training args (belong to other config groups or meta)
-_EXCLUDED_KEYS = {
-    "model",
-    "data",
-    "inference",
-    "device",
-    "project_root",
-    "variant",
-    "imgsz",
-    "mlflow",
-}
-
-
-def build_train_args(
-    cfg: DictConfig | dict,
-    data_yaml: str | Path,
-    device: int = 0,
-) -> dict:
-    """Build training arguments dict from Hydra config.
-
-    Merges model and training configs, excluding non-training keys.
-    The model name is handled separately when constructing the YOLO object.
-    """
-    training = (
-        OmegaConf.to_container(cfg.training, resolve=True)
-        if isinstance(cfg, DictConfig) and "training" in cfg
-        else {}
-    )
-    model_cfg = (
-        OmegaConf.to_container(cfg.model, resolve=True)
-        if isinstance(cfg, DictConfig) and "model" in cfg
-        else {}
-    )
-
-    args = {}
-    # Add training params
-    for k, v in training.items():
-        if k not in _EXCLUDED_KEYS:
-            args[k] = v
-
-    # Add imgsz from model config
-    if "imgsz" in model_cfg:
-        args["imgsz"] = model_cfg["imgsz"]
-
-    args["data"] = str(data_yaml)
-    args["device"] = device
-    return args
+# Re-export for backwards compatibility with tests
+_EXCLUDED_KEYS = EXCLUDED_KEYS
+_resolve_last_checkpoint = resolve_last_checkpoint
 
 
 def get_model_name(cfg: DictConfig | dict) -> str:
@@ -64,22 +21,7 @@ def get_model_name(cfg: DictConfig | dict) -> str:
     return cfg.get("model", {}).get("name", "yolo11m.pt")
 
 
-def _resolve_last_checkpoint(cfg: DictConfig) -> Path:
-    """Resolve path to last.pt checkpoint for resuming training.
-
-    Raises:
-        FileNotFoundError: If the checkpoint does not exist.
-    """
-    project_root = Path(cfg.project_root)
-    checkpoint = (
-        project_root / cfg.training.project / cfg.training.name / "weights" / "last.pt"
-    )
-    if not checkpoint.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {checkpoint}")
-    return checkpoint
-
-
-def train(cfg: DictConfig, data_yaml: Path):
+def train(cfg: DictConfig, data_yaml: str | Path):
     """Run detection training from Hydra config.
 
     Args:
@@ -87,7 +29,7 @@ def train(cfg: DictConfig, data_yaml: Path):
         data_yaml: Path to YOLO data.yaml.
     """
     if cfg.training.get("resume", False):
-        checkpoint = _resolve_last_checkpoint(cfg)
+        checkpoint = resolve_last_checkpoint(cfg)
         model = YOLO(str(checkpoint))
     else:
         model_name = get_model_name(cfg)
