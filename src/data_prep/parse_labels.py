@@ -92,7 +92,7 @@ def generate_data_yaml(
     data["names"] = class_mapping
 
     with open(output_path, "w", encoding="utf-8") as f:
-        yaml.dump(
+        yaml.safe_dump(
             data, f, default_flow_style=False, allow_unicode=True, sort_keys=False
         )
 
