@@ -33,7 +33,8 @@ def train(cfg: DictConfig, data_yaml: str | Path):
         model = YOLO(str(checkpoint))
     else:
         model_name = get_model_name(cfg)
-        model = YOLO(model_name)
+        model_path = Path(cfg.project_root) / "models" / model_name
+        model = YOLO(str(model_path))
 
     device = cfg.get("device", 0)
     train_args = build_train_args(cfg, data_yaml, device=device)

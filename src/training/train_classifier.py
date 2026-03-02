@@ -28,7 +28,8 @@ def train_classifier(cfg: DictConfig, data_path: str | Path):
             if isinstance(cfg, DictConfig) and "model" in cfg
             else "yolo11m-cls.pt"
         )
-        model = YOLO(model_name)
+        model_path = Path(cfg.project_root) / "models" / model_name
+        model = YOLO(str(model_path))
 
     device = cfg.get("device", 0) if isinstance(cfg, DictConfig) else 0
     train_args = build_train_args(cfg, str(data_path), device=device)
