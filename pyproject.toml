@@ -9,13 +9,11 @@ dependencies = [
     "ultralytics>=8.1.0",
     "opencv-python>=4.8.0",
     "albumentations>=1.3.0",
-    "supervision>=0.16.0",
     "numpy>=1.24.0",
     "Pillow>=10.0.0",
     "tqdm>=4.65.0",
     "hydra-core>=1.3.0",
     "omegaconf>=2.3.0",
-    "mlflow>=3.9.0",
 ]
 
 [project.optional-dependencies]
@@ -24,7 +22,7 @@ dev = [
     "pytest-cov>=4.1.0",
 ]
 tracking = [
-    "mlflow>=2.10.0",
+    "mlflow>=3.9.0",
 ]
 
 [tool.uv.sources]
