@@ -20,11 +20,7 @@ wheels/
 
 # Claude
 .claude/
-PROJECT_PLAN.md
-CODE_REVIEW.md
-
-# Tests
-/tests/
+*.md
 
 # Misc.
 .pytest_cache/
