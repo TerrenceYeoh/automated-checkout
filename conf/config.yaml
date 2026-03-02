@@ -2,6 +2,7 @@ defaults:
   - model: yolo11m
   - training: detect
   - inference: default
+  - evaluation: default
   - data: checkout
   - mlflow: default
   - _self_
