@@ -317,7 +317,8 @@ class TestResumeDetector:
         mock_yolo_cls.return_value = mock_model
 
         train(cfg, str(tmp_path / "data.yaml"))
-        mock_yolo_cls.assert_called_once_with("yolo11m.pt")
+        expected = str(Path(cfg.project_root) / "models" / "yolo11m.pt")
+        mock_yolo_cls.assert_called_once_with(expected)
 
 
 class TestResumeClassifier:
