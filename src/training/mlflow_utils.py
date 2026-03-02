@@ -124,7 +124,10 @@ def _start_mlflow_ui(tracking_uri: str, port: int) -> subprocess.Popen | None:
             # Process exited immediately (port in use, etc.)
             return None
         return proc
-    except Exception:
+    except Exception as e:
+        import logging
+
+        logging.debug("Failed to start MLflow UI: %s", e)
         return None
 
 
