@@ -15,6 +15,9 @@ wheels/
 /runs/
 /checkpoints/
 
+# Pretrained weights
+/models/
+
 # Hydra
 /outputs/
 
