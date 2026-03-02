@@ -9,6 +9,7 @@ EXCLUDED_KEYS = {
     "model",
     "data",
     "inference",
+    "evaluation",
     "device",
     "project_root",
     "variant",
