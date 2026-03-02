@@ -148,29 +148,20 @@ def split_dataset(
         (output_dir / "labels" / split).mkdir(parents=True, exist_ok=True)
 
     # Copy files
-    for stem in train_stems:
-        shutil.copy2(
-            images_dir / f"{stem}.jpg", output_dir / "images" / "train" / f"{stem}.jpg"
-        )
-        shutil.copy2(
-            labels_dir / f"{stem}.txt", output_dir / "labels" / "train" / f"{stem}.txt"
-        )
-
-    for stem in val_stems:
-        shutil.copy2(
-            images_dir / f"{stem}.jpg", output_dir / "images" / "val" / f"{stem}.jpg"
-        )
-        shutil.copy2(
-            labels_dir / f"{stem}.txt", output_dir / "labels" / "val" / f"{stem}.txt"
-        )
-
-    for stem in test_stems:
-        shutil.copy2(
-            images_dir / f"{stem}.jpg", output_dir / "images" / "test" / f"{stem}.jpg"
-        )
-        shutil.copy2(
-            labels_dir / f"{stem}.txt", output_dir / "labels" / "test" / f"{stem}.txt"
-        )
+    for stems, split_name in [
+        (train_stems, "train"),
+        (val_stems, "val"),
+        (test_stems, "test"),
+    ]:
+        for stem in stems:
+            shutil.copy2(
+                images_dir / f"{stem}.jpg",
+                output_dir / "images" / split_name / f"{stem}.jpg",
+            )
+            shutil.copy2(
+                labels_dir / f"{stem}.txt",
+                output_dir / "labels" / split_name / f"{stem}.txt",
+            )
 
     print(
         f"Split complete: {len(train_stems)} train, "
