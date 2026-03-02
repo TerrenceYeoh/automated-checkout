@@ -8,6 +8,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from ultralytics import YOLO
 
+from data_prep.parse_labels import get_class_mapping, parse_label_file
 from inference.counter import TrackRecord, count_products, filter_short_tracks
 
 
@@ -55,6 +56,8 @@ def _init_video_writer(video_path: Path, output_path: Path) -> cv2.VideoWriter:
         Configured cv2.VideoWriter ready for writing frames.
     """
     cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video: {video_path}")
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -203,7 +206,6 @@ def run_pipeline(
 
 @hydra.main(version_base=None, config_path="../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    from data_prep.parse_labels import get_class_mapping, parse_label_file
 
     project_root = Path(cfg.project_root)
     labels = parse_label_file(project_root / cfg.data.label_file)
