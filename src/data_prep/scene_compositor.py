@@ -135,27 +135,34 @@ def validate_yolo_label(label: str) -> bool:
 def _augment_crop(crop: np.ndarray, target_h: int) -> np.ndarray:
     """Apply random augmentations to a product crop.
 
-    Resizes to fit within the scene and applies transforms.
+    Order: scale → flip → rotation → perspective → erasing → brightness/contrast.
     """
     h, w = crop.shape[:2]
 
-    # Random scale relative to target scene height
+    # 1. Scale relative to target scene height
     scale = random.uniform(0.08, 0.35) * target_h / h
     new_w = max(int(w * scale), 1)
     new_h = max(int(h * scale), 1)
     crop = cv2.resize(crop, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-    # Random rotation
-    angle = random.uniform(-30, 30)
-    if abs(angle) > 2:
-        center = (new_w // 2, new_h // 2)
+    # 2. Flip — horizontal 50%, vertical 20%
+    if random.random() < 0.5:
+        crop = cv2.flip(crop, 1)  # horizontal
+    if random.random() < 0.2:
+        crop = cv2.flip(crop, 0)  # vertical
+
+    # 3. Rotation ±180° (80% probability)
+    if random.random() < 0.8:
+        angle = random.uniform(-180, 180)
+        h_cur, w_cur = crop.shape[:2]
+        center = (w_cur // 2, h_cur // 2)
         M = cv2.getRotationMatrix2D(center, angle, 1.0)
         cos = abs(M[0, 0])
         sin = abs(M[0, 1])
-        rot_w = int(new_h * sin + new_w * cos)
-        rot_h = int(new_h * cos + new_w * sin)
-        M[0, 2] += (rot_w - new_w) / 2
-        M[1, 2] += (rot_h - new_h) / 2
+        rot_w = int(h_cur * sin + w_cur * cos)
+        rot_h = int(h_cur * cos + w_cur * sin)
+        M[0, 2] += (rot_w - w_cur) / 2
+        M[1, 2] += (rot_h - h_cur) / 2
         crop = cv2.warpAffine(
             crop,
             M,
@@ -165,7 +172,44 @@ def _augment_crop(crop: np.ndarray, target_h: int) -> np.ndarray:
             borderValue=(0, 0, 0, 0),
         )
 
-    # Random brightness/contrast on RGB channels only
+    # 4. Perspective warp (40% probability)
+    if random.random() < 0.4:
+        h_cur, w_cur = crop.shape[:2]
+        if h_cur > 4 and w_cur > 4:
+            margin_x = max(int(w_cur * 0.08), 1)
+            margin_y = max(int(h_cur * 0.08), 1)
+            src_pts = np.float32([[0, 0], [w_cur, 0], [w_cur, h_cur], [0, h_cur]])
+            dst_pts = np.float32(
+                [
+                    [random.randint(0, margin_x), random.randint(0, margin_y)],
+                    [w_cur - random.randint(0, margin_x), random.randint(0, margin_y)],
+                    [
+                        w_cur - random.randint(0, margin_x),
+                        h_cur - random.randint(0, margin_y),
+                    ],
+                    [random.randint(0, margin_x), h_cur - random.randint(0, margin_y)],
+                ]
+            )
+            M_persp = cv2.getPerspectiveTransform(src_pts, dst_pts)
+            crop = cv2.warpPerspective(
+                crop,
+                M_persp,
+                (w_cur, h_cur),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=(0, 0, 0, 0),
+            )
+
+    # 5. Random erasing (30% probability) — set alpha to 0
+    if random.random() < 0.3:
+        h_cur, w_cur = crop.shape[:2]
+        erase_h = random.randint(h_cur // 8, h_cur // 3)
+        erase_w = random.randint(w_cur // 8, w_cur // 3)
+        ey = random.randint(0, h_cur - erase_h)
+        ex = random.randint(0, w_cur - erase_w)
+        crop[ey : ey + erase_h, ex : ex + erase_w, 3] = 0
+
+    # 6. Brightness/contrast on RGB channels (50% probability)
     if random.random() < 0.5:
         rgb = crop[:, :, :3].astype(np.float32)
         brightness = random.uniform(-30, 30)
@@ -251,10 +295,18 @@ def compose_scene(
 def _apply_scene_augmentations(scene: np.ndarray) -> np.ndarray:
     """Apply global augmentations to the composed scene."""
     # Motion blur (simulates conveyor belt movement)
-    if random.random() < 0.3:
-        kernel_size = random.choice([3, 5, 7])
+    if random.random() < 0.6:
+        kernel_size = random.choice([5, 7, 11, 15])
         kernel = np.zeros((kernel_size, kernel_size))
         kernel[kernel_size // 2, :] = 1.0 / kernel_size
+        # Add directional rotation ±10°
+        angle = random.uniform(-10, 10)
+        center = (kernel_size // 2, kernel_size // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        kernel = cv2.warpAffine(kernel, M, (kernel_size, kernel_size))
+        kernel_sum = kernel.sum()
+        if kernel_sum > 0:
+            kernel /= kernel_sum
         scene = cv2.filter2D(scene, -1, kernel)
 
     # Gaussian noise
