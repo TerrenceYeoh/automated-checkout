@@ -9,7 +9,13 @@ from omegaconf import DictConfig, OmegaConf
 from ultralytics import YOLO
 
 from data_prep.parse_labels import get_class_mapping, parse_label_file
-from inference.counter import TrackRecord, count_products, filter_short_tracks
+from inference.counter import (
+    TrackRecord,
+    count_products,
+    filter_by_entry_zone,
+    filter_short_tracks,
+    stitch_tracks,
+)
 
 
 def format_results(
@@ -98,7 +104,7 @@ def run_video_inference(
         output_path = Path(output_dir) / f"{video_path.stem}_annotated.mp4"
         writer = _init_video_writer(video_path, output_path)
 
-    imgsz = (model_cfg or {}).get("imgsz", inference_cfg.get("imgsz", 640))
+    imgsz = inference_cfg.get("imgsz", (model_cfg or {}).get("imgsz", 640))
 
     results_generator = model.track(
         source=str(video_path),
@@ -111,7 +117,7 @@ def run_video_inference(
         verbose=False,
     )
 
-    for result in results_generator:
+    for frame_idx, result in enumerate(results_generator):
         if visualize or show_live:
             has_detections = result.boxes is not None and result.boxes.id is not None
             frame = result.plot() if has_detections else result.orig_img
@@ -131,11 +137,20 @@ def run_video_inference(
         track_ids = boxes.id.int().cpu().tolist()
         class_ids = boxes.cls.int().cpu().tolist()
         confidences = boxes.conf.cpu().tolist()
+        centers = boxes.xywhn[:, :2].cpu().tolist()  # normalized (cx, cy)
 
-        for tid, cid, conf in zip(track_ids, class_ids, confidences, strict=True):
+        for tid, cid, conf, center in zip(
+            track_ids, class_ids, confidences, centers, strict=True
+        ):
             if tid not in tracks:
-                tracks[tid] = TrackRecord(track_id=tid)
+                tracks[tid] = TrackRecord(
+                    track_id=tid,
+                    entry_position=(center[0], center[1]),
+                    first_frame=frame_idx,
+                )
             tracks[tid].add_detection(cid, conf)
+            tracks[tid].last_frame = frame_idx
+            tracks[tid].last_position = (center[0], center[1])
 
     if writer is not None:
         writer.release()
@@ -189,8 +204,30 @@ def run_pipeline(
         )
         print(f"  Raw tracks: {len(raw_tracks)}")
 
+        stitch_cfg = inference_cfg.get("stitch", {})
+        stitch_max_gap = stitch_cfg.get("max_gap", 0)
+        stitch_max_dist = stitch_cfg.get("max_distance", 0.15)
+        if stitch_max_gap > 0:
+            before_stitch = len(raw_tracks)
+            raw_tracks = stitch_tracks(
+                raw_tracks, max_gap=stitch_max_gap, max_distance=stitch_max_dist
+            )
+            print(
+                f"  After stitching (gap={stitch_max_gap}, dist={stitch_max_dist}): {len(raw_tracks)} (from {before_stitch})"
+            )
+
         tracks = filter_short_tracks(raw_tracks, min_length=min_track_len)
         print(f"  After filtering (min {min_track_len} frames): {len(tracks)}")
+
+        entry_zone_cfg = inference_cfg.get("entry_zone", {})
+        if entry_zone_cfg.get("enabled", False):
+            edge = entry_zone_cfg.get("edge", "left")
+            zone_size = entry_zone_cfg.get("size", 0.15)
+            before = len(tracks)
+            tracks = filter_by_entry_zone(tracks, edge=edge, zone_size=zone_size)
+            print(
+                f"  After entry zone filter ({edge}, {zone_size}): {len(tracks)} (from {before})"
+            )
 
         counts = count_products(tracks)
         print(
