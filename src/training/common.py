@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from omegaconf import DictConfig, OmegaConf
+from ultralytics import YOLO
 
 # Keys that are not YOLO training args (belong to other config groups or meta)
 EXCLUDED_KEYS = {
@@ -15,7 +16,31 @@ EXCLUDED_KEYS = {
     "variant",
     "imgsz",
     "mlflow",
+    "backbone_weights",
 }
+
+
+def transfer_backbone_weights(
+    detector: YOLO,
+    classifier_weights: str | Path,
+) -> int:
+    """Transfer matching backbone weights from classifier to detector.
+
+    Uses strict=False to skip mismatched head layers.
+    Returns number of transferred parameters.
+    """
+    cls_model = YOLO(str(classifier_weights))
+    cls_state = cls_model.model.state_dict()
+    det_state = detector.model.state_dict()
+
+    # Find matching keys (same name + same shape)
+    transferred = {}
+    for key in det_state:
+        if key in cls_state and cls_state[key].shape == det_state[key].shape:
+            transferred[key] = cls_state[key]
+
+    detector.model.load_state_dict(transferred, strict=False)
+    return len(transferred)
 
 
 def resolve_last_checkpoint(cfg: DictConfig) -> Path:
