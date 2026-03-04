@@ -1,12 +1,24 @@
 # Inference settings
-conf_thresh: 0.3
+conf_thresh: 0.15
 iou_thresh: 0.45
-tracker: bytetrack.yaml
+tracker: conf/trackers/botsort_reid.yaml
 persist: true
 
 # Counting
-min_track_length: 5
+min_track_length: 15
 class_vote_method: majority
+imgsz: [384, 640]
+
+# Track stitching (merge fragments from occlusion breaks)
+stitch:
+  max_gap: 90
+  max_distance: 0.15
+
+# Entry zone counting
+entry_zone:
+  enabled: true
+  edge: left
+  size: 0.15
 
 # Export
 export_format: engine
