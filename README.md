@@ -464,23 +464,33 @@ Automated-Checkout/
 │   │   └── split_dataset.py       # Train/val split (85/15, deterministic)
 │   ├── training/
 │   │   ├── train_detector.py      # YOLO detection training (Hydra entry point)
-│   │   └── train_classifier.py    # Optional classification pretraining
+│   │   ├── train_classifier.py    # Optional classification pretraining
+│   │   ├── common.py              # Shared helpers (build_train_args, EXCLUDED_KEYS)
+│   │   └── mlflow_utils.py        # MLflow experiment tracking integration
 │   ├── inference/
 │   │   ├── run_inference.py       # Video → detect → track → count pipeline
 │   │   └── counter.py             # Track filtering, majority voting, counting
+│   ├── evaluation/
+│   │   ├── evaluate.py            # Evaluation entry point (detection/counting/both)
+│   │   ├── detection_metrics.py   # YOLO model.val() wrapper + result formatting
+│   │   └── counting_metrics.py    # Predicted vs ground truth product counts
 │   └── utils/
 │       ├── extract_backgrounds.py # Extract conveyor belt frames from test videos
 │       └── visualization.py       # Debug: draw YOLO boxes on images
 ├── conf/                          # Hydra configuration
 │   ├── config.yaml                # Root config (defaults + global settings)
-│   ├── model/                     # Model variants (yolo11m, yolo11l, yolo11x, ...)
+│   ├── model/                     # Model variants (yolo11m, yolo11m_cls)
 │   ├── training/                  # Hyperparams (detect.yaml, classify.yaml)
 │   ├── inference/                 # Inference settings (thresholds, tracker)
+│   ├── evaluation/                # Evaluation mode, metrics, thresholds
+│   ├── mlflow/                    # Experiment tracking (default, disabled)
 │   └── data/                      # Dataset paths and composition params
-├── tests/                         # 89 unit tests (pytest)
-│   ├── data_prep/                 # 56 tests for pipeline modules
-│   ├── training/                  # 14 tests for config building
-│   └── inference/                 # 19 tests for counting + pipeline
+├── tests/                         # 190 unit tests (pytest)
+│   ├── data_prep/                 # 69 tests for pipeline modules
+│   ├── training/                  # 50 tests for config + MLflow
+│   ├── inference/                 # 25 tests for counting + pipeline
+│   ├── evaluation/                # 32 tests for metrics + evaluation
+│   └── utils/                     # 14 tests for backgrounds + visualization
 ├── data/                          # Raw data (not tracked in git)
 │   ├── train/                     # 116,500 training images
 │   ├── segmentation_labels/       # 116,500 masks
@@ -488,8 +498,10 @@ Automated-Checkout/
 │   ├── crops/                     # Generated RGBA crops
 │   └── backgrounds/               # Extracted conveyor belt frames
 ├── datasets/checkout/             # Generated YOLO-format dataset
+├── models/                        # Pretrained weights (auto-downloaded)
 ├── runs/                          # Training outputs (weights, metrics)
-├── outputs/                       # Inference results (JSON per video)
+├── logs/                          # Hydra log files
+├── outputs/                       # Inference + evaluation results
 ├── PROJECT_PLAN.md                # Detailed implementation plan
 ├── CODE_REVIEW.md                 # Codebase review findings
 └── pyproject.toml                 # Dependencies and project config
@@ -551,10 +563,24 @@ PYTHONPATH=src uv run python src/inference/run_inference.py
 PYTHONPATH=src uv run python src/inference/run_inference.py inference.conf_thresh=0.5
 ```
 
-### 4. Testing
+### 4. Evaluation
 
 ```bash
-uv run pytest                  # Run all 89 tests
+# Run detection evaluation (mAP on val set)
+PYTHONPATH=src uv run python src/evaluation/evaluate.py
+
+# Run counting evaluation (requires ground truth)
+PYTHONPATH=src uv run python src/evaluation/evaluate.py evaluation.mode=counting \
+  evaluation.ground_truth_dir=path/to/gt evaluation.predictions_dir=outputs/
+
+# Run both detection + counting
+PYTHONPATH=src uv run python src/evaluation/evaluate.py evaluation.mode=both
+```
+
+### 5. Testing
+
+```bash
+uv run pytest                  # Run all 190 tests
 uv run pytest -v               # Verbose output
 uv run pytest tests/inference  # Run specific module tests
 ```
@@ -565,9 +591,11 @@ All settings are managed via [Hydra](https://hydra.cc/) with composable config g
 
 | Config Group | Default | Options | Description |
 |---|---|---|---|
-| `model` | `yolo11m` | `yolo11l`, `yolo11x`, `yolo8m`, `yolo11m_cls` | Model architecture and image size |
+| `model` | `yolo11m` | `yolo11m_cls` | Model architecture and image size |
 | `training` | `detect` | `classify` | Hyperparameters (epochs, batch, optimizer, augmentations) |
 | `inference` | `default` | -- | Confidence/IoU thresholds, tracker, counting params |
+| `evaluation` | `default` | -- | Evaluation mode (detection/counting/both), metrics |
+| `mlflow` | `default` | `disabled` | MLflow experiment tracking configuration |
 | `data` | `checkout` | -- | Dataset paths, scene composition params |
 
 Override any setting via CLI:
@@ -580,6 +608,7 @@ python src/training/train_detector.py model=yolo11l training.batch=8 device=1
 - **Detection:** [Ultralytics YOLO11](https://docs.ultralytics.com/) (detection + tracking)
 - **Tracking:** ByteTrack (native Ultralytics integration)
 - **Config:** [Hydra](https://hydra.cc/) + OmegaConf
+- **Experiment Tracking:** [MLflow](https://mlflow.org/) (auto-logs metrics and artifacts)
 - **Deep Learning:** PyTorch 2.x (CUDA 12.8)
 - **CV:** OpenCV, Pillow, Albumentations
 - **Package Manager:** [uv](https://docs.astral.sh/uv/)
