@@ -5,4 +5,5 @@
 #   model.name=yolov8m.pt model.variant=yolov8m
 name: yolo11m.pt
 variant: yolo11m
-imgsz: 640
+imgsz: [384, 640]
+backbone_weights: null   # e.g. runs/classify/pretrain_v1/weights/best.pt
