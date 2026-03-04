@@ -4,8 +4,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 from omegaconf import OmegaConf
 
+from training.common import transfer_backbone_weights
 from training.train_classifier import (
     _resolve_last_checkpoint as _resolve_last_checkpoint_cls,
 )
@@ -417,3 +419,154 @@ class TestBuildTrainArgsResume:
         )
         args = build_train_args(cfg, "/tmp/data.yaml")
         assert args["resume"] is False
+
+
+class TestBackboneWeightTransfer:
+    """Tests for classifier → detector backbone weight transfer."""
+
+    def test_backbone_weights_excluded_from_train_args(self):
+        """backbone_weights must not be passed to model.train()."""
+        cfg = OmegaConf.create(
+            {
+                "model": {
+                    "name": "yolo11m.pt",
+                    "variant": "yolo11m",
+                    "imgsz": 640,
+                    "backbone_weights": "runs/classify/pretrain_v1/weights/best.pt",
+                },
+                "training": {"epochs": 10, "batch": 16},
+            }
+        )
+        args = build_train_args(cfg, "/tmp/data.yaml")
+        assert "backbone_weights" not in args
+
+    @patch("training.train_detector.transfer_backbone_weights", return_value=150)
+    @patch("training.train_detector.YOLO")
+    def test_transfer_called_when_configured(self, mock_yolo, mock_transfer, tmp_path):
+        """When backbone_weights is set, transfer_backbone_weights is called."""
+        mock_model = MagicMock()
+        mock_yolo.return_value = mock_model
+
+        weights_path = tmp_path / "best.pt"
+        weights_path.touch()
+
+        project_root = str(tmp_path / "project")
+        cfg = OmegaConf.create(
+            {
+                "model": {
+                    "name": "yolo11m.pt",
+                    "variant": "yolo11m",
+                    "imgsz": 640,
+                    "backbone_weights": str(weights_path),
+                },
+                "training": {
+                    "epochs": 5,
+                    "batch": 16,
+                    "project": "runs/detect",
+                    "name": "test_v1",
+                    "exist_ok": True,
+                },
+                "device": 0,
+                "project_root": project_root,
+            }
+        )
+
+        train(cfg, str(tmp_path / "data.yaml"))
+        mock_transfer.assert_called_once_with(mock_model, Path(weights_path))
+
+    @patch("training.train_detector.transfer_backbone_weights")
+    @patch("training.train_detector.YOLO")
+    def test_transfer_skipped_when_null(self, mock_yolo, mock_transfer, tmp_path):
+        """When backbone_weights is null, no transfer attempted."""
+        mock_model = MagicMock()
+        mock_yolo.return_value = mock_model
+
+        project_root = str(tmp_path / "project")
+        cfg = OmegaConf.create(
+            {
+                "model": {
+                    "name": "yolo11m.pt",
+                    "variant": "yolo11m",
+                    "imgsz": 640,
+                    "backbone_weights": None,
+                },
+                "training": {
+                    "epochs": 5,
+                    "batch": 16,
+                    "project": "runs/detect",
+                    "name": "test_v1",
+                    "exist_ok": True,
+                },
+                "device": 0,
+                "project_root": project_root,
+            }
+        )
+
+        train(cfg, str(tmp_path / "data.yaml"))
+        mock_transfer.assert_not_called()
+
+    @patch("training.train_detector.transfer_backbone_weights")
+    @patch("training.train_detector.YOLO")
+    def test_transfer_skipped_on_resume(self, mock_yolo, mock_transfer, tmp_path):
+        """When resume=True, no transfer even if backbone_weights is set."""
+        mock_model = MagicMock()
+        mock_yolo.return_value = mock_model
+
+        project_root = str(tmp_path / "project")
+        checkpoint = (
+            tmp_path / "project" / "runs" / "detect" / "test_v1" / "weights" / "last.pt"
+        )
+        checkpoint.parent.mkdir(parents=True)
+        checkpoint.touch()
+
+        cfg = OmegaConf.create(
+            {
+                "model": {
+                    "name": "yolo11m.pt",
+                    "variant": "yolo11m",
+                    "imgsz": 640,
+                    "backbone_weights": "runs/classify/pretrain_v1/weights/best.pt",
+                },
+                "training": {
+                    "epochs": 5,
+                    "batch": 16,
+                    "project": "runs/detect",
+                    "name": "test_v1",
+                    "exist_ok": True,
+                    "resume": True,
+                },
+                "device": 0,
+                "project_root": project_root,
+            }
+        )
+
+        train(cfg, str(tmp_path / "data.yaml"))
+        mock_transfer.assert_not_called()
+
+    def test_transfer_backbone_weights_returns_count(self):
+        """transfer_backbone_weights returns the number of transferred layers."""
+        # Create mock detector and classifier with matching state dicts
+        detector = MagicMock()
+        det_state = {
+            "model.0.conv.weight": torch.randn(64, 3, 3, 3),
+            "model.0.conv.bias": torch.randn(64),
+            "model.22.head.weight": torch.randn(116, 256),  # detection head
+        }
+        detector.model.state_dict.return_value = det_state
+
+        cls_weights = MagicMock()
+        cls_state = {
+            "model.0.conv.weight": torch.randn(64, 3, 3, 3),  # matches
+            "model.0.conv.bias": torch.randn(64),  # matches
+            "model.22.linear.weight": torch.randn(116, 1280),  # cls head, no match
+        }
+
+        with patch("training.common.YOLO") as mock_yolo:
+            mock_cls_model = MagicMock()
+            mock_cls_model.model.state_dict.return_value = cls_state
+            mock_yolo.return_value = mock_cls_model
+
+            n = transfer_backbone_weights(detector, cls_weights)
+
+        assert n == 2  # Only the two matching keys
+        detector.model.load_state_dict.assert_called_once()
