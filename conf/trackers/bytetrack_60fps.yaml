@@ -1,0 +1,10 @@
+# ByteTrack fallback tuned for 60fps video.
+# 60-frame buffer = 1 second at 60fps.
+
+tracker_type: bytetrack
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.3
+track_buffer: 180
+match_thresh: 0.8
+fuse_score: true
