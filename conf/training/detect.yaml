@@ -12,14 +12,15 @@ cos_lr: true
 hsv_h: 0.015
 hsv_s: 0.5
 hsv_v: 0.3
-degrees: 15
+degrees: 180
 translate: 0.1
 scale: 0.5
-flipud: 0.1
+flipud: 0.3
 fliplr: 0.5
 mosaic: 1.0
 mixup: 0.1
 copy_paste: 0.1
+erasing: 0.3
 
 # Resume
 resume: false
